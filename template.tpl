@@ -22,6 +22,11 @@ ___INFO___
   "description": "This template enables integration with Google Consent Mode v2.\nIt sets default consent states, updates them based on user choices, and passes them securely through the GTM API.",
   "containerContexts": [
     "WEB"
+  ],
+  "categories": [
+    "TAG_MANAGEMENT",
+    "ANALYTICS",
+    "MARKETING"
   ]
 }
 
