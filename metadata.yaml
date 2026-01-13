@@ -1,5 +1,5 @@
 homepage: "https://inbmarketing.pl"
 documentation: "https://inbmarketing.pl/inb-marketing-cmp"
 versions:
-  - sha: "3b14a9576056e25abb315f8707e88201d64c6375"
+  - sha: "19d310c3dc452a6603b153998c4a2eba13e7390f"
     changeNotes: "Initial public release of INB Marketing CMP template."
