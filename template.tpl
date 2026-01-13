@@ -22,11 +22,6 @@ ___INFO___
   "description": "This template enables integration with Google Consent Mode v2.\nIt sets default consent states, updates them based on user choices, and passes them securely through the GTM API.",
   "containerContexts": [
     "WEB"
-  ],
-  "categories": [
-    "TAG_MANAGEMENT",
-    "ANALYTICS",
-    "MARKETING"
   ]
 }
 
@@ -150,55 +145,77 @@ function buildConsentStateFromObject(obj) {
 }
 
 // ------------------------------------------------------
-// 1. Ustawienie domyślnych zgód z tabeli "Domyślne ustawienia zgód"
+// 1. Ustawienie domyślnych zgód (Default Consent State)
 // ------------------------------------------------------
 
-// Uwaga: tabela ma internal name "paramTable1"
+// Lista wymaganych typów zgód przez Google (Consent Mode v2)
+// To zapewnia, że szablon zawsze bierze je pod uwagę.
+var requiredConsentTypes = [
+  'ad_storage', 
+  'analytics_storage', 
+  'ad_user_data', 
+  'ad_personalization'
+];
+
 var defaultRows = data.paramTable1 || [];
+var defaultsSet = false;
 
-defaultRows.forEach(function (row) {
-  // Kolumny:
-  // row.text1 - Region
-  // row.text2 - Granted (lista zgód)
-  // row.text3 - Denied  (lista zgód)
-  var region = row.text1;
-  var grantedList = row.text2;
-  var deniedList = row.text3;
+// A. Jeśli użytkownik skonfigurował tabelę regionów
+if (defaultRows.length > 0) {
+  defaultRows.forEach(function (row) {
+    var region = row.text1;
+    var grantedList = row.text2;
+    var deniedList = row.text3;
 
-  var grantedState = buildConsentStateFromList(grantedList, 'granted');
-  var deniedState = buildConsentStateFromList(deniedList, 'denied');
+    var grantedState = buildConsentStateFromList(grantedList, 'granted');
+    var deniedState = buildConsentStateFromList(deniedList, 'denied');
 
-  var consentState = {};
+    var consentState = {};
 
-  Object.keys(grantedState).forEach(function (key) {
-    consentState[key] = grantedState[key];
+    // Scalanie zgód
+    Object.keys(grantedState).forEach(function (key) {
+      consentState[key] = grantedState[key];
+    });
+
+    Object.keys(deniedState).forEach(function (key) {
+      consentState[key] = deniedState[key];
+    });
+
+    if (Object.keys(consentState).length === 0) {
+      return;
+    }
+
+    // Opcje wywołania
+    var options = {
+      wait_for_update: 500
+    };
+
+    if (region) {
+      options.region = region;
+    }
+
+    setDefaultConsentState(consentState, options);
+    defaultsSet = true;
   });
+}
 
-  Object.keys(deniedState).forEach(function (key) {
-    consentState[key] = deniedState[key];
+// B. ZABEZPIECZENIE (FALLBACK) - To jest kluczowe dla akceptacji Google
+// Jeśli tabela jest pusta LUB nie ustawiono żadnych zgód,
+// ustawiamy bezpieczne wartości domyślne dla wszystkich 4 typów.
+if (!defaultsSet) {
+  setDefaultConsentState({
+    'ad_storage': 'denied',
+    'analytics_storage': 'denied',
+    'ad_user_data': 'denied',        // Wymagane v2
+    'ad_personalization': 'denied',  // Wymagane v2
+    'wait_for_update': 500
   });
-
-  if (Object.keys(consentState).length === 0) {
-    // pusty wiersz – nic nie ustawiamy
-    return;
-  }
-
-  var options = {
-    wait_for_update: 500
-  };
-
-  if (region) {
-    options.region = region;
-  }
-
-  setDefaultConsentState(consentState, options);
-});
+}
 
 // ------------------------------------------------------
-// 2. Aktualne zgody z pliku cookie CMP
+// 2. Aktualne zgody z pliku cookie CMP (Update Consent State)
 // ------------------------------------------------------
 
-// Internal name pola "Nazwa pliku cookie CMP" => nazwaPlikuCookieCMP
 var cmpCookieName = data.nazwaPlikuCookieCMP;
 
 if (!cmpCookieName) {
@@ -210,7 +227,6 @@ if (!cmpCookieName) {
     var raw = cookieValues[0];
     var parsed = null;
 
-    // Zakładamy poprawny JSON
     if (raw) {
       parsed = JSON.parse(raw);
     }
@@ -218,12 +234,7 @@ if (!cmpCookieName) {
     if (parsed) {
       var consentFromCookie = buildConsentStateFromObject(parsed);
 
-      // ------------------------------------------------------
       // 2a. Uwzględnienie checkboxów z szablonu
-      // checkbox1 – Włącz ads_data_redaction
-      // checkbox2 – Włącz url_passthrough
-      // ------------------------------------------------------
-
       if (data.checkbox1 === true) {
         consentFromCookie['ads_data_redaction'] = 'granted';
       } else if (data.checkbox1 === false) {
@@ -247,7 +258,7 @@ if (!cmpCookieName) {
   }
 }
 
-// Jeżeli kod wykonał się do końca, oznaczamy tag jako udany
+// Oznaczamy tag jako udany
 data.gtmOnSuccess();
 
 
@@ -317,6 +328,130 @@ ___WEB_PERMISSIONS___
                   {
                     "type": 1,
                     "string": "write_consent_state"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "ad_storage"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "ad_user_data"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "ad_personalization"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "analytics_storage"
                   },
                   {
                     "type": 8,
@@ -402,6 +537,6 @@ scenarios: []
 
 ___NOTES___
 
-Created on 2.12.2025, 09:13:47
+Created on 13.01.2026, 08:05:34
 
 
